@@ -1,3 +1,88 @@
 <resources>
     <string name="app_name">OBD Garaj</string>
+
+    <!-- Genel -->
+    <string name="back">Geri</string>
+    <string name="cancel">Vazgeç</string>
+    <string name="refresh">Yenile</string>
+    <string name="not_connected">Araca bağlı değil.</string>
+    <string name="connection_lost">Adaptör bağlantısı koptu.</string>
+    <string name="reconnect">Yeniden bağlan</string>
+    <string name="disconnect">Bağlantıyı kes</string>
+    <string name="loading">Okunuyor…</string>
+
+    <!-- Garaj -->
+    <string name="garage_title">Garaj</string>
+    <string name="garage_hint">Bağlanmak istediğin aracı seç.</string>
+    <string name="kind_car">Otomobil</string>
+    <string name="kind_motorcycle">Motosiklet</string>
+    <string name="never_connected">Henüz bağlanılmadı</string>
+    <string name="last_connected">Son bağlantı: %1$s</string>
+    <string name="last_dtc_count">Son okumada %1$d arıza kodu</string>
+    <string name="open_console">Konsol</string>
+
+    <!-- Bağlan -->
+    <string name="connect_title">Adaptöre bağlan</string>
+    <string name="connect_permission_needed">Adaptörleri görmek için Bluetooth izni gerekli.</string>
+    <string name="connect_grant">İzin ver</string>
+    <string name="connect_bt_off">Bluetooth kapalı. Açıp tekrar dene.</string>
+    <string name="connect_bonded">Eşleşmiş adaptörler (klasik Bluetooth)</string>
+    <string name="connect_ble">Yakındaki BLE adaptörler</string>
+    <string name="connect_scan">BLE tara</string>
+    <string name="connect_scanning">Taranıyor…</string>
+    <string name="connect_demo">Demo adaptör (araçsız deneme)</string>
+    <string name="connect_none_bonded">Eşleşmiş cihaz yok. Klasik ELM327\'yi önce telefonun Bluetooth ayarlarından eşleştir (PIN genelde 1234 veya 0000).</string>
+    <string name="connect_tip">Kontak açık olmalı. Motosikletlerde adaptör kablosunun takılı olduğundan emin ol.</string>
+    <string name="connect_vin_matched">VIN ile eşleşen araç seçildi: %1$s</string>
+
+    <!-- Araç ekranı -->
+    <string name="tab_live">Canlı</string>
+    <string name="tab_dtc">Arızalar</string>
+    <string name="tab_info">Bilgi</string>
+    <string name="tab_console">Konsol</string>
+
+    <!-- Canlı veri -->
+    <string name="live_hint">İzlemek istediğin verileri işaretle.</string>
+    <string name="live_dropped">Araç bu veriyi göndermiyor</string>
+    <string name="live_ecu">ECU %1$s</string>
+
+    <!-- Arızalar -->
+    <string name="dtc_read">Arızaları oku</string>
+    <string name="dtc_mil_on">Arıza lambası YANIYOR</string>
+    <string name="dtc_mil_off">Arıza lambası sönük</string>
+    <string name="dtc_count_reported">ECU\'nun bildirdiği kod sayısı: %1$d</string>
+    <string name="dtc_stored">Aktif</string>
+    <string name="dtc_pending">Bekleyen</string>
+    <string name="dtc_permanent">Kalıcı</string>
+    <string name="dtc_none">Kod yok</string>
+    <string name="dtc_manufacturer">Üreticiye özel kod (açıklama yok)</string>
+    <string name="dtc_unknown">Açıklama bulunamadı</string>
+    <string name="dtc_freeze">Arıza anı verisi (freeze frame)</string>
+    <string name="dtc_freeze_trigger">Tetikleyen kod: %1$s</string>
+    <string name="dtc_clear">Kodları sil</string>
+    <string name="dtc_clear_title">Arıza kodları silinsin mi?</string>
+    <string name="dtc_clear_body">• Kontak AÇIK, motor KAPALI olmalı.\n• Tüm aktif ve bekleyen kodlar ile arıza anı verisi silinir.\n• Hazırlık monitörleri sıfırlanır; muayene öncesi silmek aracı testten geçirmeyebilir.\n• Arızanın kendisi giderilmez, sorun sürüyorsa kod geri gelir.</string>
+    <string name="dtc_clear_confirm">Evet, sil</string>
+    <string name="dtc_cleared">Kodlar silindi.</string>
+    <string name="dtc_clear_failed">Araç silme komutunu onaylamadı.</string>
+
+    <!-- Bilgi -->
+    <string name="info_vin">Şasi numarası (VIN)</string>
+    <string name="info_vin_none">Araç VIN göndermedi</string>
+    <string name="info_protocol">Protokol</string>
+    <string name="info_adapter">Adaptör</string>
+    <string name="info_ecus">Cevap veren ECU\'lar</string>
+    <string name="info_ecu_name">ECU adı</string>
+    <string name="info_cal">Kalibrasyon kimlikleri</string>
+    <string name="info_supported">Desteklenen PID\'ler</string>
+    <string name="info_monitors">Hazırlık monitörleri</string>
+    <string name="monitor_complete">Tamam</string>
+    <string name="monitor_incomplete">Tamamlanmadı</string>
+
+    <!-- Konsol -->
+    <string name="console_hint">Komut (ör. 010C, ATRV)</string>
+    <string name="console_send">Gönder</string>
+    <string name="console_share">Log\'u paylaş</string>
+    <string name="console_clear">Temizle</string>
+    <string name="console_readonly">Yalnızca AT ve okuma komutları (01, 02, 03, 07, 09, 0A) gönderilebilir.</string>
 </resources>

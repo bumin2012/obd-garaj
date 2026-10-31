@@ -31,6 +31,9 @@ class ConnectionManager(private val log: ObdLog, private val scope: CoroutineSco
 
     var session: ObdSession? = null
         private set
+    /** Konsolun ham komut göndermesi için; komutlar yine [CommandGuard]'dan geçer. */
+    var connection: ElmConnection? = null
+        private set
     private var transport: ObdTransport? = null
     private var job: Job? = null
 
@@ -41,7 +44,8 @@ class ConnectionManager(private val log: ObdLog, private val scope: CoroutineSco
             try {
                 step("Adaptöre bağlanılıyor (${transport.label})")
                 transport.open()
-                val s = ObdSession(ElmConnection(transport, log))
+                val conn = ElmConnection(transport, log)
+                val s = ObdSession(conn)
                 step("Adaptör başlatılıyor, araç protokolü aranıyor")
                 val init = s.initialize()
                 log.record(LogDirection.INFO, "Protokol: ${init.protocol}, ECU'lar: ${init.ecus}, ${init.elmVersion}")
@@ -50,6 +54,7 @@ class ConnectionManager(private val log: ObdLog, private val scope: CoroutineSco
                 step("Araç kimliği okunuyor")
                 val vin = s.readVehicleInfo().vin
                 session = s
+                connection = conn
                 _state.value = ConnState.Connected(init, supported, vin, transport.label)
             } catch (e: CancellationException) {
                 throw e
@@ -68,6 +73,7 @@ class ConnectionManager(private val log: ObdLog, private val scope: CoroutineSco
         val t = transport
         transport = null
         session = null
+        connection = null
         if (t != null) scope.launch { runCatching { t.close() } }
         _state.value = ConnState.Idle
     }
@@ -78,6 +84,7 @@ class ConnectionManager(private val log: ObdLog, private val scope: CoroutineSco
         val t = transport
         transport = null
         session = null
+        connection = null
         if (t != null) scope.launch { runCatching { t.close() } }
         _state.value = ConnState.Lost
     }
