@@ -38,3 +38,18 @@ class FakeTransport(
 
     override suspend fun close() = Unit
 }
+
+/**
+ * "KOMUT => CEVAP" satırlarından bir cevaplayıcı üretir. '#' ile başlayan satırlar yorumdur,
+ * cevapta '|' satır sonu demektir. Betikte olmayan komutlara "NO DATA" döner.
+ */
+fun scriptResponder(script: String): (String) -> String? {
+    val map = script.lineSequence()
+        .map { it.trim() }
+        .filter { it.isNotEmpty() && !it.startsWith("#") && "=>" in it }
+        .associate { line ->
+            val (cmd, reply) = line.split("=>", limit = 2)
+            cmd.trim().uppercase().replace(" ", "") to reply.trim()
+        }
+    return { cmd -> map[cmd.uppercase().replace(" ", "")] ?: "NO DATA" }
+}
