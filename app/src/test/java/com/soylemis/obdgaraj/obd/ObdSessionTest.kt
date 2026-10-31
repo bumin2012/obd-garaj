@@ -29,6 +29,30 @@ class ObdSessionTest {
         assertEquals(emptyList<String>(), init.skippedCommands)
     }
 
+    /** K-line motosikletlerde ATSP0 otomatik araması 10 sn'yi aşabilir. */
+    @Test
+    fun initWaitsForSlowProtocolSearch() = runTest {
+        val t = FakeTransport(C4_SCRIPT, slowCommands = mapOf("0100" to 15_000L))
+        t.open()
+        val init = ObdSession(ElmConnection(t, ObdLog())).initialize()
+        assertEquals(listOf("7E8"), init.ecus)
+    }
+
+    @Test
+    fun readPidSeparatesNoDataFromBusErrors() = runTest {
+        val (s, _) = session {
+            when (it) {
+                "010D" -> "NO DATA"
+                "0111" -> "BUS BUSY"
+                else -> C4_SCRIPT(it)
+            }
+        }
+        s.initialize()
+        assertEquals(PidResult.NoData, s.readPidResult(0x0D))
+        assertTrue(s.readPidResult(0x11) is PidResult.Failed)
+        assertTrue(s.readPidResult(0x0C) is PidResult.Values)
+    }
+
     @Test
     fun initSkipsUnsupportedAtCommand() = runTest {
         val (s, _) = session { if (it == "ATAT1") "?" else C4_SCRIPT(it) }

@@ -54,6 +54,14 @@ class ResponseParserTest {
     }
 
     @Test
+    fun truncatedFramesAreErrorsNotCrashes() {
+        val p = ObdProtocol.CAN_11_500
+        assertTrue(ResponseParser.parse("7E810\r", p) is ElmResponse.Error)
+        assertTrue(ResponseParser.parse("7E8\r", p) is ElmResponse.Error)
+        assertTrue(ResponseParser.parse("83F1\r", ObdProtocol.KWP_FAST) is ElmResponse.Error)
+    }
+
+    @Test
     fun mapsNoDataAndErrors() {
         val p = ObdProtocol.CAN_11_500
         assertEquals(ElmResponse.NoData, ResponseParser.parse("NO DATA\r", p))

@@ -32,6 +32,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.soylemis.obdgaraj.AppContainer
 import com.soylemis.obdgaraj.R
+import com.soylemis.obdgaraj.log.LogDirection
 import com.soylemis.obdgaraj.data.DtcDescription
 import com.soylemis.obdgaraj.obd.ConnState
 import com.soylemis.obdgaraj.obd.Dtc
@@ -79,8 +80,8 @@ class DtcViewModel(private val c: AppContainer) : ViewModel() {
                 }
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: IOException) {
-                c.connectionManager.markLost()
+            } catch (e: Exception) {
+                if (e is IOException) c.connectionManager.markLost() else c.log.record(LogDirection.ERROR, "Hata: $e")
                 _ui.update { it.copy(loading = false) }
             }
         }
@@ -94,8 +95,8 @@ class DtcViewModel(private val c: AppContainer) : ViewModel() {
                 session.clearDtcs(token)
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: IOException) {
-                c.connectionManager.markLost()
+            } catch (e: Exception) {
+                if (e is IOException) c.connectionManager.markLost() else c.log.record(LogDirection.ERROR, "Hata: $e")
                 false
             } finally {
                 clearFlow.reset()

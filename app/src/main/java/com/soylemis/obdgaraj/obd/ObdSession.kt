@@ -19,6 +19,13 @@ data class VehicleInfo(
 
 class PidReading(val ecu: String, val pid: Int, val raw: IntArray, val text: String)
 
+/** Canlı veride "araç bu PID'i göndermiyor" ile "veri yolu anlık hata verdi" ayrımı için. */
+sealed interface PidResult {
+    data class Values(val readings: List<PidReading>) : PidResult
+    data object NoData : PidResult
+    data class Failed(val error: ElmError) : PidResult
+}
+
 /** Başlatılmış bir ELM327 üzerinden standart OBD2 servislerini okur. */
 class ObdSession(private val conn: ElmConnection) {
     var protocol: ObdProtocol = ObdProtocol.AUTO
@@ -32,7 +39,8 @@ class ObdSession(private val conn: ElmConnection) {
         for (cmd in listOf("ATE0", "ATL0", "ATS0", "ATH1", "ATSP0", "ATAT1")) {
             if (conn.execute(cmd).trim() == "?") skipped += cmd
         }
-        val first = conn.execute("0100", timeoutMs = 10_000)
+        // ATSP0 otomatik araması K-line (ISO 9141/KWP 5 baud) protokollerinde uzun sürebilir.
+        val first = conn.execute("0100", timeoutMs = 25_000)
         protocol = ObdProtocol.fromDpn(conn.execute("ATDPN")) ?: ObdProtocol.AUTO
         val parsed = ResponseParser.parse(first, protocol)
         if (parsed !is ElmResponse.Data) throw NoVehicleResponseException(describe(parsed))
@@ -55,9 +63,19 @@ class ObdSession(private val conn: ElmConnection) {
     }
 
     suspend fun readPid(pid: Int): List<PidReading> =
-        query("01%02X".format(pid)).orEmpty().mapNotNull { (ecu, d) ->
-            if (d.size < 2 || d[1].toInt() and 0xFF != pid) null
-            else reading(ecu, pid, d.drop(2))
+        (readPidResult(pid) as? PidResult.Values)?.readings.orEmpty()
+
+    suspend fun readPidResult(pid: Int): PidResult =
+        when (val r = ResponseParser.parse(conn.execute("01%02X".format(pid)), protocol)) {
+            ElmResponse.NoData -> PidResult.NoData
+            is ElmResponse.Error -> PidResult.Failed(r.kind)
+            is ElmResponse.Data -> {
+                val readings = r.byEcu.mapNotNull { (ecu, d) ->
+                    if (d.size < 2 || d[1].toInt() and 0xFF != pid) null else reading(ecu, pid, d.drop(2))
+                }
+                // 7F 01 12 gibi olumsuz cevaplar da "desteklenmiyor" sayılır.
+                if (readings.isEmpty()) PidResult.NoData else PidResult.Values(readings)
+            }
         }
 
     suspend fun readMonitorStatus(): Map<String, MonitorStatus> =

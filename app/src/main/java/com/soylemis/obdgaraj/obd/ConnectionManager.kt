@@ -6,7 +6,12 @@ import com.soylemis.obdgaraj.transport.ObdTransport
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -41,6 +46,7 @@ class ConnectionManager(private val log: ObdLog, private val scope: CoroutineSco
         disconnect()
         this.transport = transport
         job = scope.launch {
+            var connected = false
             try {
                 step("Adaptöre bağlanılıyor (${transport.label})")
                 transport.open()
@@ -49,22 +55,34 @@ class ConnectionManager(private val log: ObdLog, private val scope: CoroutineSco
                 step("Adaptör başlatılıyor, araç protokolü aranıyor")
                 val init = s.initialize()
                 log.record(LogDirection.INFO, "Protokol: ${init.protocol}, ECU'lar: ${init.ecus}, ${init.elmVersion}")
+                if (init.skippedCommands.isNotEmpty()) {
+                    log.record(LogDirection.INFO, "Adaptörün desteklemediği komutlar atlandı: ${init.skippedCommands}")
+                }
                 step("Desteklenen veriler okunuyor")
                 val supported = s.discoverSupportedPids()
                 step("Araç kimliği okunuyor")
                 val vin = s.readVehicleInfo().vin
+                ensureActive()
                 session = s
                 connection = conn
                 _state.value = ConnState.Connected(init, supported, vin, transport.label)
+                connected = true
             } catch (e: CancellationException) {
-                throw e
+                // Bu iş iptal edildiyse (yeni bağlantı/disconnect) sessizce çık; değilse bir zaman aşımıdır.
+                if (!isActive) throw e
+                fail("Bağlantı zaman aşımına uğradı")
             } catch (e: Exception) {
-                val reason = if (e is NoVehicleResponseException) e.message.orEmpty() else "Bağlantı hatası: ${e.message}"
-                log.record(LogDirection.ERROR, reason)
-                runCatching { transport.close() }
-                _state.value = ConnState.Failed(reason)
+                // İptal edilmiş eski bir deneme yeni bağlantının durumunu ezmemeli.
+                if (isActive) fail(if (e is NoVehicleResponseException) e.message.orEmpty() else "Bağlantı hatası: ${e.message}")
+            } finally {
+                if (!connected) withContext(NonCancellable) { runCatching { transport.close() } }
             }
         }
+    }
+
+    private fun fail(reason: String) {
+        log.record(LogDirection.ERROR, reason)
+        _state.value = ConnState.Failed(reason)
     }
 
     fun disconnect() {
@@ -94,7 +112,8 @@ class ConnectionManager(private val log: ObdLog, private val scope: CoroutineSco
         return LivePoller(s, scope, onLost = ::markLost)
     }
 
-    private fun step(text: String) {
+    private suspend fun step(text: String) {
+        currentCoroutineContext().ensureActive()
         log.record(LogDirection.INFO, text)
         _state.value = ConnState.Connecting(text)
     }

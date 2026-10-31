@@ -35,8 +35,10 @@ class ElmConnection(private val transport: ObdTransport, private val log: ObdLog
             }
             log.record(LogDirection.TX, cmd)
             try {
-                transport.write("$cmd\r".toByteArray(Charsets.US_ASCII))
-                withTimeout(timeoutMs) { reader.await() }
+                withTimeout(timeoutMs) {
+                    transport.write("$cmd\r".toByteArray(Charsets.US_ASCII))
+                    reader.await()
+                }
             } catch (e: TimeoutCancellationException) {
                 reader.cancel()
                 log.record(LogDirection.ERROR, "Zaman aşımı: $cmd")

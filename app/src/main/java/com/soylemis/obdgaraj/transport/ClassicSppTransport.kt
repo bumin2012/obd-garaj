@@ -22,18 +22,19 @@ class ClassicSppTransport(private val device: BluetoothDevice) : ObdTransport {
     override val label: String = device.name ?: device.address
     private val _incoming = MutableSharedFlow<ByteArray>(extraBufferCapacity = 256)
     override val incoming: Flow<ByteArray> = _incoming
-    private var socket: BluetoothSocket? = null
+    @Volatile private var socket: BluetoothSocket? = null
     private var scope: CoroutineScope? = null
 
     @Suppress("DEPRECATION")
     override suspend fun open() = withContext(Dispatchers.IO) {
         BluetoothAdapter.getDefaultAdapter()?.cancelDiscovery()
+        // Soket connect() öncesi saklanır ki close() bekleyen bağlantıyı yarıda kesebilsin.
         val s = try {
-            device.createRfcommSocketToServiceRecord(SPP).also { it.connect() }
+            device.createRfcommSocketToServiceRecord(SPP).also { socket = it; it.connect() }
         } catch (e: IOException) {
-            device.createInsecureRfcommSocketToServiceRecord(SPP).also { it.connect() }
+            runCatching { socket?.close() }
+            device.createInsecureRfcommSocketToServiceRecord(SPP).also { socket = it; it.connect() }
         }
-        socket = s
         val readScope = CoroutineScope(SupervisorJob() + Dispatchers.IO).also { scope = it }
         readScope.launch {
             val buf = ByteArray(1024)

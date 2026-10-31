@@ -25,6 +25,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.soylemis.obdgaraj.AppContainer
 import com.soylemis.obdgaraj.R
+import com.soylemis.obdgaraj.log.LogDirection
 import com.soylemis.obdgaraj.obd.ConnState
 import com.soylemis.obdgaraj.obd.MonitorStatus
 import com.soylemis.obdgaraj.obd.VehicleInfo
@@ -54,8 +55,8 @@ class InfoViewModel(private val c: AppContainer) : ViewModel() {
                 _monitors.value = session.readMonitorStatus()
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: IOException) {
-                c.connectionManager.markLost()
+            } catch (e: Exception) {
+                if (e is IOException) c.connectionManager.markLost() else c.log.record(LogDirection.ERROR, "Hata: $e")
             } finally {
                 _loading.value = false
             }

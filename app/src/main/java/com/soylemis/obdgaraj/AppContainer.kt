@@ -11,6 +11,8 @@ import com.soylemis.obdgaraj.transport.AdapterScanner
 import com.soylemis.obdgaraj.transport.FakeTransport
 import com.soylemis.obdgaraj.transport.ObdTransport
 import com.soylemis.obdgaraj.transport.scriptResponder
+import com.soylemis.obdgaraj.log.LogDirection
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,8 +21,11 @@ import kotlinx.coroutines.launch
 
 /** Uygulama boyunca yaşayan bağımlılıklar (elle DI). */
 class AppContainer(private val context: Context) {
-    val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val log = ObdLog()
+    val appScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Default +
+            CoroutineExceptionHandler { _, e -> log.record(LogDirection.ERROR, "Beklenmeyen hata: $e") },
+    )
     val connectionManager = ConnectionManager(log, appScope)
     val scanner = AdapterScanner(context)
     val repository by lazy { VehicleRepository(AppDatabase.create(context).vehicleDao()) }

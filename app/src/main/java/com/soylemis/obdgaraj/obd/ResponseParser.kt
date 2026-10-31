@@ -28,7 +28,15 @@ object ResponseParser {
         "ERR" to ElmError.OTHER,
     )
 
-    fun parse(raw: String, protocol: ObdProtocol): ElmResponse {
+    /** Hiçbir girdide istisna fırlatmaz; anlaşılmayan cevaplar [ElmError.OTHER] olur. */
+    fun parse(raw: String, protocol: ObdProtocol): ElmResponse =
+        try {
+            parseUnchecked(raw, protocol)
+        } catch (e: RuntimeException) {
+            ElmResponse.Error(ElmError.OTHER, raw)
+        }
+
+    private fun parseUnchecked(raw: String, protocol: ObdProtocol): ElmResponse {
         val lines = raw.split('\r', '\n').map { it.trim().uppercase() }.filter { it.isNotEmpty() }
         val dataLines = mutableListOf<String>()
         for (line in lines) {
@@ -64,10 +72,13 @@ object ResponseParser {
                 if (len == 0 || first.size < 1 + len) null else first.copyOfRange(1, 1 + len)
             }
             0x1 -> {
+                if (first.size < 2) return null
                 val len = ((pci and 0x0F) shl 8) or (first[1].toInt() and 0xFF)
                 val out = ArrayList<Byte>(len)
                 first.drop(2).forEach { out += it }
-                frames.drop(1).filter { (it[0].toInt() and 0xF0) == 0x20 }.forEach { cf -> cf.drop(1).forEach { out += it } }
+                frames.drop(1)
+                    .filter { it.isNotEmpty() && (it[0].toInt() and 0xF0) == 0x20 }
+                    .forEach { cf -> cf.drop(1).forEach { out += it } }
                 if (out.size < len) null else out.take(len).toByteArray()
             }
             else -> null

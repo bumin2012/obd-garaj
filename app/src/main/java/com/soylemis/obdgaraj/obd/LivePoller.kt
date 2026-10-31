@@ -1,5 +1,6 @@
 package com.soylemis.obdgaraj.obd
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -13,7 +14,8 @@ import java.io.IOException
 
 /**
  * Seçili PID'leri sırayla sorgular. Arka arkaya [NO_DATA_LIMIT] kez NO DATA dönen PID
- * döngüden çıkarılır; adaptör cevap vermezse döngü durur ve [onLost] çağrılır.
+ * döngüden çıkarılır; anlık veri yolu hataları sayılmaz. Adaptör cevap vermezse döngü
+ * durur ve [onLost] çağrılır.
  */
 class LivePoller(
     private val session: ObdSession,
@@ -42,18 +44,24 @@ class LivePoller(
                 val active = pids - _dropped.value
                 for (pid in active.sorted()) {
                     val result = try {
-                        session.readPid(pid)
+                        session.readPidResult(pid)
+                    } catch (e: CancellationException) {
+                        throw e
                     } catch (e: IOException) {
                         onLost()
                         return@launch
                     }
-                    if (result.isEmpty()) {
-                        val n = (noDataCount[pid] ?: 0) + 1
-                        noDataCount[pid] = n
-                        if (n >= NO_DATA_LIMIT) _dropped.update { it + pid }
-                    } else {
-                        noDataCount[pid] = 0
-                        _readings.update { it + (pid to result.first()) }
+                    when (result) {
+                        is PidResult.Values -> {
+                            noDataCount[pid] = 0
+                            _readings.update { it + (pid to result.readings.first()) }
+                        }
+                        PidResult.NoData -> {
+                            val n = (noDataCount[pid] ?: 0) + 1
+                            noDataCount[pid] = n
+                            if (n >= NO_DATA_LIMIT) _dropped.update { it + pid }
+                        }
+                        is PidResult.Failed -> Unit
                     }
                 }
                 delay(CYCLE_PAUSE_MS)

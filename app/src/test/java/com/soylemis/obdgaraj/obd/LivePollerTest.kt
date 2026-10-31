@@ -50,6 +50,31 @@ class LivePollerTest {
     }
 
     @Test
+    fun pollerKeepsPidOnTransientBusErrors() = runTest {
+        val (m, t) = connected { if (it == "010D") "BUS BUSY" else C4_SCRIPT(it) }
+        val p = m.newPoller()
+        p.setPids(setOf(0x0D))
+        val before = t.written.size
+        p.start()
+        advanceTimeBy(1000)
+        p.stop()
+        assertEquals(emptySet<Int>(), p.dropped.value)
+        assertTrue(t.written.drop(before).count { it == "010D" } > 2)
+    }
+
+    @Test
+    fun pollerSurvivesGarbledResponse() = runTest {
+        val (m, _) = connected { if (it == "010C") "7E810" else C4_SCRIPT(it) }
+        val p = m.newPoller()
+        p.setPids(setOf(0x0C, 0x0D))
+        p.start()
+        advanceTimeBy(500)
+        assertTrue(p.isRunning)
+        assertEquals("50 km/h", p.readings.value.getValue(0x0D).text)
+        p.stop()
+    }
+
+    @Test
     fun pollerStopsOnTimeout() = runTest {
         var dead = false
         val (m, _) = connected { if (dead) null else C4_SCRIPT(it) }

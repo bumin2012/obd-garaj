@@ -13,6 +13,8 @@ class FakeTransport(
     private val delayMs: Long = 0,
     private val chunkSize: Int? = null,
     override val label: String = "Demo",
+    /** Belirli komutlara ek gecikme (ör. yavaş protokol araması). */
+    private val slowCommands: Map<String, Long> = emptyMap(),
 ) : ObdTransport {
     private val _incoming = MutableSharedFlow<ByteArray>(extraBufferCapacity = 1024)
     override val incoming: Flow<ByteArray> = _incoming
@@ -30,7 +32,8 @@ class FakeTransport(
             pending.delete(0, end + 1)
             written += cmd
             val reply = responder(cmd) ?: continue
-            if (delayMs > 0) delay(delayMs)
+            val wait = delayMs + (slowCommands[cmd] ?: 0L)
+            if (wait > 0) delay(wait)
             val text = reply.replace('|', '\r') + "\r\r>"
             text.chunked(chunkSize ?: text.length).forEach { _incoming.emit(it.toByteArray(Charsets.US_ASCII)) }
         }

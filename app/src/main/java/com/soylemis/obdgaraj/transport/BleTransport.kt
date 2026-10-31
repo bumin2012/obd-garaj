@@ -9,10 +9,8 @@ import android.bluetooth.BluetoothGattDescriptor
 import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.os.Build
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.withTimeout
 import java.io.IOException
 
 /** BLE (GATT) ELM327 adaptörü: bir karakteristiğe yazar, diğerinden bildirim alır. */
@@ -23,32 +21,32 @@ class BleTransport(private val context: Context, private val device: BluetoothDe
     private val _incoming = MutableSharedFlow<ByteArray>(extraBufferCapacity = 256)
     override val incoming: Flow<ByteArray> = _incoming
 
-    private var gatt: BluetoothGatt? = null
+    @Volatile private var gatt: BluetoothGatt? = null
     private var writeChar: BluetoothGattCharacteristic? = null
-    private var chunkSize = 20
-    private var step: CompletableDeferred<Int>? = null
+    @Volatile private var chunkSize = 20
+    private val steps = GattSteps()
 
     private val callback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
-            if (newState == BluetoothProfile.STATE_CONNECTED) step?.complete(status)
-            else step?.completeExceptionally(IOException("BLE bağlantısı koptu ($status)"))
+            if (newState == BluetoothProfile.STATE_CONNECTED) steps.complete(GattOp.CONNECT, status)
+            else steps.fail(IOException("BLE bağlantısı koptu ($status)"))
         }
 
         override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
-            step?.complete(status)
+            steps.complete(GattOp.DISCOVER, status)
         }
 
         override fun onMtuChanged(g: BluetoothGatt, mtu: Int, status: Int) {
             if (status == BluetoothGatt.GATT_SUCCESS) chunkSize = (mtu - 3).coerceIn(20, 244)
-            step?.complete(status)
+            steps.complete(GattOp.MTU, status)
         }
 
         override fun onDescriptorWrite(g: BluetoothGatt, d: BluetoothGattDescriptor, status: Int) {
-            step?.complete(status)
+            steps.complete(GattOp.DESCRIPTOR, status)
         }
 
         override fun onCharacteristicWrite(g: BluetoothGatt, c: BluetoothGattCharacteristic, status: Int) {
-            step?.complete(status)
+            steps.complete(GattOp.WRITE, status)
         }
 
         override fun onCharacteristicChanged(g: BluetoothGatt, c: BluetoothGattCharacteristic) {
@@ -60,18 +58,18 @@ class BleTransport(private val context: Context, private val device: BluetoothDe
         }
     }
 
-    /** Bir GATT işlemini başlatır ve geri çağrısını bekler (Android aynı anda tek işlem kabul eder). */
-    private suspend fun await(action: () -> Boolean): Int {
-        val d = CompletableDeferred<Int>().also { step = it }
-        if (!action()) throw IOException("BLE işlemi başlatılamadı")
-        return withTimeout(10_000) { d.await() }
+    private suspend fun runOk(op: GattOp, start: () -> Boolean) {
+        val status = steps.run(op, start = start)
+        if (status != BluetoothGatt.GATT_SUCCESS) throw IOException("BLE işlemi başarısız: $op (durum $status)")
     }
 
     override suspend fun open() {
-        await { device.connectGatt(context, false, callback, BluetoothDevice.TRANSPORT_LE).also { gatt = it } != null }
+        runOk(GattOp.CONNECT) {
+            device.connectGatt(context, false, callback, BluetoothDevice.TRANSPORT_LE).also { gatt = it } != null
+        }
         val g = gatt ?: throw IOException("BLE bağlantısı kurulamadı")
-        await { g.discoverServices() }
-        runCatching { await { g.requestMtu(247) } }
+        runOk(GattOp.DISCOVER) { g.discoverServices() }
+        runCatching { steps.run(GattOp.MTU) { g.requestMtu(247) } }
         val services = g.services.associate { s ->
             s.uuid to s.characteristics.map { c ->
                 CharProps(
@@ -92,7 +90,7 @@ class BleTransport(private val context: Context, private val device: BluetoothDe
         } else {
             BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
         }
-        await {
+        runOk(GattOp.DESCRIPTOR) {
             if (Build.VERSION.SDK_INT >= 33) {
                 g.writeDescriptor(cccd, value) == BluetoothGatt.GATT_SUCCESS
             } else {
@@ -112,7 +110,7 @@ class BleTransport(private val context: Context, private val device: BluetoothDe
         }
         for (chunk in bytes.toList().chunked(chunkSize)) {
             val data = chunk.toByteArray()
-            await {
+            runOk(GattOp.WRITE) {
                 if (Build.VERSION.SDK_INT >= 33) {
                     g.writeCharacteristic(c, data, type) == BluetoothGatt.GATT_SUCCESS
                 } else {
