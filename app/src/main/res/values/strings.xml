@@ -44,7 +44,16 @@
     <!-- Canlı veri -->
     <string name="live_hint">İzlemek istediğin verileri işaretle.</string>
     <string name="live_dropped">Araç bu veriyi göndermiyor</string>
+    <string name="live_dropped_short">Yok</string>
     <string name="live_ecu">ECU %1$s</string>
+    <string name="live_record">Sefer kaydı (grafik + CSV için)</string>
+    <string name="live_none_selected">Henüz veri seçilmedi — yukarıdaki grup çiplerinden birine dokun ya da aşağıdaki listeden seç.</string>
+    <string name="live_list_show">Diğer verileri göster</string>
+    <string name="live_list_hide">Listeyi gizle</string>
+    <string name="group_engine">Motor</string>
+    <string name="group_fuel">Yakıt</string>
+    <string name="group_perf">Performans</string>
+    <string name="group_emission">Emisyon</string>
 
     <!-- Arızalar -->
     <string name="dtc_read">Arızaları oku</string>
@@ -69,6 +78,10 @@
     <!-- Bilgi -->
     <string name="info_vin">Şasi numarası (VIN)</string>
     <string name="info_vin_none">Araç VIN göndermedi</string>
+    <string name="info_manufacturer">Üretici (VIN WMI)</string>
+    <string name="info_extended">Üretici-özel veriler (Mode 22)</string>
+    <string name="info_extended_note">Bu değerler kamuya açık kaynaklardan gelir; aracında doğrulanmadıysa şüpheyle yaklaş.</string>
+    <string name="info_export_csv">Son seferi CSV paylaş</string>
     <string name="info_protocol">Protokol</string>
     <string name="info_adapter">Adaptör</string>
     <string name="info_ecus">Cevap veren ECU\'lar</string>

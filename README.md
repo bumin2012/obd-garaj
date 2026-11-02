@@ -21,5 +21,22 @@ derleyip `obd-garaj-debug-apk` adıyla artifact olarak yükler.
 
 ## Güvenlik
 
-Uygulama araca yalnızca okuma komutları gönderir (`AT*`, servis `01 02 03 07 09 0A`).
+Uygulama araca yalnızca okuma komutları gönderir (`AT*`, servis `01 02 03 07 09 0A 22`).
 Arıza kodu silme (`04`) yalnızca onay ekranından sonra gönderilir.
+Servis `22` (üretici-özel okuma, Mode 22) yalnız CAN protokollerinde ve `ExtendedPids`
+beyaz listesindeki PID'ler için kullanılır; UDS yazma servisleri (`2E` vb.) CommandGuard'dan
+geçemez.
+
+## Özellikler (v0.2)
+
+- **VIN → üretici tanıma:** WMI tablosu ile (Stellantis/Renault/Toyota/Yamaha…); Bilgi
+  ekranında üretici etiketi gösterilir.
+- **Üretici-özel veriler (Mode 22):** PSA ve Yamaha için genişletilmiş PID okuma;
+  değerler kamuya açık kaynaklıdır ve araçta doğrulanmadıysa ekranda uyarı notu gösterilir.
+- **Özelleştirilebilir PID tablosu:** `assets/pids_custom.json` (ya da ayarlara kaydedilen
+  JSON) yerleşik tabloyu tamamlar/aşar; formüller güvenli aritmetik ayrıştırıcıyla
+  çalışır (script yok).
+- **Sefer kaydı + grafik:** Canlı sekmede kayıt açılınca seçili PID'ler 1 sn'de bir
+  Room'a yazılır, satır altlarında sparkline grafik görünür.
+- **CSV dışa aktarma:** Bilgi sekmesinden son sefer, Torque-uyumlu `;` ayraçlı CSV olarak
+  paylaşılır (Türkçe Excel uyumlu).
