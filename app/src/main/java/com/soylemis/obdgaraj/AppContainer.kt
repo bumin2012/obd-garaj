@@ -2,11 +2,14 @@ package com.soylemis.obdgaraj
 
 import android.app.Application
 import android.content.Context
+import android.content.SharedPreferences
 import com.soylemis.obdgaraj.data.AppDatabase
 import com.soylemis.obdgaraj.data.DtcDictionary
+import com.soylemis.obdgaraj.data.TripRepository
 import com.soylemis.obdgaraj.data.VehicleRepository
 import com.soylemis.obdgaraj.log.ObdLog
 import com.soylemis.obdgaraj.obd.ConnectionManager
+import com.soylemis.obdgaraj.obd.PidTable
 import com.soylemis.obdgaraj.transport.AdapterScanner
 import com.soylemis.obdgaraj.transport.FakeTransport
 import com.soylemis.obdgaraj.transport.ObdTransport
@@ -28,8 +31,11 @@ class AppContainer(private val context: Context) {
     )
     val connectionManager = ConnectionManager(log, appScope)
     val scanner = AdapterScanner(context)
-    val repository by lazy { VehicleRepository(AppDatabase.create(context).vehicleDao()) }
+    private val db by lazy { AppDatabase.create(context) }
+    val repository by lazy { VehicleRepository(db.vehicleDao()) }
+    val tripRepository by lazy { TripRepository(db.tripDao()) }
     val dtcDictionary by lazy { DtcDictionary.fromAssets(context) }
+    private val prefs: SharedPreferences by lazy { context.getSharedPreferences("settings", Context.MODE_PRIVATE) }
 
     /** Garajda seçilen ya da VIN ile eşleşen araç. */
     val currentVehicleId = MutableStateFlow<Long?>(null)
@@ -37,14 +43,23 @@ class AppContainer(private val context: Context) {
     /** Demo adaptörle bağlıyken araç profiline ve arıza geçmişine yazılmaz. */
     @Volatile var demoMode: Boolean = false
 
+    /** Kullanıcı PID eklentisi (pids.json metni); bozuk JSON yüklenmez. */
+    var pidJson: String?
+        get() = prefs.getString(KEY_PIDS, null) ?: context.assets.open("pids_custom.json")
+            .bufferedReader().use { it.readText() }.takeIf { it.isNotBlank() && it != "[]" }
+        set(value) { prefs.edit().putString(KEY_PIDS, value).apply() }
+
+    init {
+        appScope.launch { repository.seedIfEmpty() }
+        PidTable.install(pidJson)
+    }
+
     fun demoTransport(): ObdTransport {
         val script = context.assets.open("demo/c4_can.txt").bufferedReader().use { it.readText() }
         return FakeTransport(scriptResponder(script), delayMs = 40, label = "Demo (Citroën C4 betiği)")
     }
 
-    init {
-        appScope.launch { repository.seedIfEmpty() }
-    }
+    private companion object { const val KEY_PIDS = "pids_json" }
 }
 
 class ObdApp : Application() {

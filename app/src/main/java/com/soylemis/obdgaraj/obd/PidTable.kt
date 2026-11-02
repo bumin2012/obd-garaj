@@ -12,14 +12,14 @@ class PidDef(
     val decode: (IntArray) -> Double,
 )
 
-/** SAE J1979 Mode 01 PID tanımları. */
+/** SAE J1979 Mode 01 PID tanımları. Yerleşik taban + isteğe bağlı JSON eklentisi. */
 object PidTable {
     private fun ab(d: IntArray) = d[0] * 256.0 + d[1]
     private fun pct(d: IntArray) = d[0] * 100.0 / 255
     private fun temp(d: IntArray) = d[0] - 40.0
     private fun trim(d: IntArray) = d[0] / 1.28 - 100
 
-    val defs: Map<Int, PidDef> = listOf(
+    val baseDefs: Map<Int, PidDef> = listOf(
         PidDef(0x04, "Hesaplanan motor yükü", "%", 1, ::pct),
         PidDef(0x05, "Soğutma suyu sıcaklığı", "°C", 1, ::temp),
         PidDef(0x06, "Kısa dönem yakıt düzeltmesi (Bank 1)", "%", 1, ::trim),
@@ -58,6 +58,15 @@ object PidTable {
         PidDef(0x5C, "Motor yağı sıcaklığı", "°C", 1, ::temp),
         PidDef(0x5E, "Yakıt tüketimi", "L/h", 2) { ab(it) / 20 },
     ).associateBy { it.pid }
+
+    /** Uygulama başlangıcında [PidCatalog] ile birleştirilmiş aktif tablo (bkz. AppContainer). */
+    @Volatile
+    var defs: Map<Int, PidDef> = baseDefs
+        private set
+
+    /** JSON eklentisini yükler; bozuk JSON'da mevcut tabloya dokunmadan false döner. */
+    fun install(extraJson: String?): Boolean =
+        runCatching { PidCatalog.merge(baseDefs, extraJson) }.onSuccess { defs = it }.isSuccess
 
     fun name(pid: Int): String = defs[pid]?.nameTr ?: "PID %02X".format(pid)
 
