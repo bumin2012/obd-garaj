@@ -112,6 +112,33 @@ class ObdSession(private val conn: ElmConnection) {
         return out
     }
 
+    /**
+     * Mode 22 genişletilmiş okuma. Yalnız [ExtendedPids] beyaz listesindeki PID'ler
+     * ve yalnız CAN protokolleri için; diğer her durumda boş liste döner (sessiz hayır).
+     */
+    suspend fun readExtendedPids(m: Manufacturer): List<PidReading> {
+        if (!protocol.isCan) return emptyList()
+        val out = mutableListOf<PidReading>()
+        for (x in ExtendedPids.forManufacturer(m)) {
+            val cmd = "22%04X".format(x.pid)
+            // Araç/klon adaptör Mode 22'yi hiç desteklemeyebilir: tek PID'in hatası
+            // bağlantıyı düşürmez, o PID atlanır.
+            val parsed = runCatching { ResponseParser.parse(conn.execute(cmd, timeoutMs = 2000), protocol) }
+                .getOrNull()
+            if (parsed !is ElmResponse.Data) continue
+            for ((ecu, d) in parsed.byEcu) {
+                val payload = d.drop(3) // 6A + 2 bayt PID yankısı
+                if (payload.size < x.byteCount) continue
+                val raw = payload.take(x.byteCount).map { it.toInt() and 0xFF }.toIntArray()
+                val text = with(java.text.DecimalFormat("0.##", java.text.DecimalFormatSymbols(java.util.Locale.forLanguageTag("tr")))) {
+                    format(x.decode(raw)).let { if (x.unit.isEmpty()) it else "$it ${x.unit}" }
+                }
+                out += PidReading(ecu, x.pid, raw, text)
+            }
+        }
+        return out
+    }
+
     suspend fun readVehicleInfo(): VehicleInfo {
         val vin = query("0902")?.values?.firstNotNullOfOrNull { VinDecoder.decode(it.drop(2).toByteArray()) }
         val names = query("090A").orEmpty().mapNotNull { (ecu, d) ->

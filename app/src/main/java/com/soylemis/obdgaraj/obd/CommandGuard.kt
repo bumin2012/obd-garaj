@@ -23,6 +23,12 @@ class ForbiddenCommandException(val cmd: String) :
 object CommandGuard {
     private val readServices = setOf("01", "02", "03", "07", "09", "0A")
     private const val CLEAR_SERVICE = "04"
+    /**
+     * Mode 22 (üretici-özel okuma) servis bazında serbesttir; hangi PID'lere izin
+     * verildiğini ObdSession, ExtendedPids beyaz listesiyle denetler. UDS 0x2E gibi
+     * yazma servisleri değildir — yalnız okuma istemidir.
+     */
+    private const val EXTENDED_READ_SERVICE = "22"
 
     /** Yalnızca harf, rakam, boşluk ve '@'; satır sonu gibi kontrol karakterleri yok. */
     private val allowedChars = Regex("^[0-9A-Za-z @]+$")
@@ -45,6 +51,7 @@ object CommandGuard {
         val service = normalized.substring(0, 2)
         when {
             service in readServices -> return
+            service == EXTENDED_READ_SERVICE && normalized.length >= 4 -> return
             service == CLEAR_SERVICE && normalized.length == 2 && confirmation != null -> return
             else -> throw ForbiddenCommandException(cmd)
         }
